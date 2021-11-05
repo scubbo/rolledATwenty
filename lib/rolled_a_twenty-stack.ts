@@ -21,7 +21,7 @@ export class RolledATwentyStack extends cdk.Stack {
           commands: [
             'npm ci',
             'npm run build',
-            'npx cdk synth'
+            `npx cdk synth --context user=${user} --context repo=${repo} --context branch=${branch} --context secretName=${secretName}`
           ]
         }
     )

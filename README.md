@@ -1,14 +1,19 @@
-# Welcome to your CDK TypeScript project!
+# What is this?
 
-This is a blank project for TypeScript development with CDK.
+* If your interest is in the technological implementation: A CDK package that defines a self-mutating CodePipeline
+  that deploys static content to a BucketDeployment with a CloudFront distribution fronting it.
+* If your interest is in the outcome: The code that makes [this site](https://butirolledanat20.net/) work.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+# How do I contribute to this?
 
-## Useful commands
+If you're technical enough to know what "make a Pull Request" means - go ahead!
 
- * `npm run build`   compile typescript to js
- * `npm run watch`   watch for changes and compile
- * `npm run test`    perform the jest unit tests
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+If you're not - go ahead and email me your suggested content at [scubbojj@gmail.com](mailto: scubbojj@gmail.com).
+
+# No, I meant how do I contribute _financially_?
+
+I'm touched by the intention. Working on it.
+
+# But you're wrong about nat20s!
+
+No I'm not.

@@ -1,5 +1,73 @@
+import {DnsValidatedCertificate} from '@aws-cdk/aws-certificatemanager';
+import {Distribution, ViewerProtocolPolicy} from '@aws-cdk/aws-cloudfront';
+import {S3Origin} from '@aws-cdk/aws-cloudfront-origins';
+import {PolicyStatement} from '@aws-cdk/aws-iam';
+import {ARecord, HostedZone, RecordTarget} from "@aws-cdk/aws-route53";
+import {CloudFrontTarget} from "@aws-cdk/aws-route53-targets";
+import {Bucket} from '@aws-cdk/aws-s3';
+import {BucketDeployment, Source} from '@aws-cdk/aws-s3-deployment';
 import * as cdk from '@aws-cdk/core';
 import {CodeBuildStep, CodePipeline, CodePipelineSource} from '@aws-cdk/pipelines';
+
+interface WebsiteStageProps extends cdk.StageProps {
+  domainName: string
+}
+
+class WebsiteStage extends cdk.Stage {
+  constructor(scope: cdk.Construct, id: string, props: WebsiteStageProps) {
+    super(scope, id, props);
+
+    new WebsiteStack(this, 'WebsiteStack', {domainName: props.domainName});
+  }
+}
+
+interface WebsiteStackProps extends cdk.StackProps {
+  domainName: string
+}
+
+class WebsiteStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: WebsiteStackProps) {
+    super(scope, id, {
+      ...props,
+      env: {
+        account: process.env.CDK_DEFAULT_ACCOUNT,
+        region: process.env.CDK_DEFAULT_REGION
+      }});
+
+    const bucket = new Bucket(this, 'Bucket');
+
+    const domainName = props.domainName;
+    const zone = HostedZone.fromLookup(this, 'hostedZone', {
+      domainName: domainName
+    });
+    const certificate = new DnsValidatedCertificate(this, 'mySiteCert', {
+      domainName: domainName,
+      hostedZone: zone,
+    });
+    const distribution = new Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: new S3Origin(bucket),
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
+      },
+      defaultRootObject: 'index.html',
+      domainNames: [domainName],
+      certificate: certificate,
+    });
+
+    new BucketDeployment(this, 'BucketDeployment', {
+      destinationBucket: bucket,
+      distribution: distribution,
+      sources: [Source.asset('static-content')]
+    });
+
+    new ARecord(this, 'ARecord', {
+      zone,
+      target: RecordTarget.fromAlias(new CloudFrontTarget(distribution))
+    })
+    
+    
+  }
+}
 
 export class RolledATwentyStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -9,6 +77,7 @@ export class RolledATwentyStack extends cdk.Stack {
     const repo = this.node.tryGetContext("repo");
     const branch = this.node.tryGetContext("branch");
     const secretName = this.node.tryGetContext("secretName");
+    const domainName = this.node.tryGetContext("domainName");
 
     // https://cdkworkshop.com/20-typescript/70-advanced-topics/200-pipelines/3000-new-pipeline.html
     const codeBuildAction = new CodeBuildStep('SynthStep', {
@@ -21,13 +90,25 @@ export class RolledATwentyStack extends cdk.Stack {
           commands: [
             'npm ci',
             'npm run build',
-            'npx cdk synth'
+            `npx cdk synth --context user=${user} --context repo=${repo} --context branch=${branch} --context secretName=${secretName} --context domainName=${domainName}`
+          ],
+          rolePolicyStatements: [
+            new PolicyStatement({
+              actions: ['sts:AssumeRole'],
+              resources: ['*'],
+              conditions: {
+                StringEquals: {
+                  'iam:ResourceTag/aws-cdk:bootstrap-role': 'lookup',
+                },
+              },
+            }),
           ]
         }
     )
 
-    new CodePipeline(this, 'pipeline', {
+    const pipeline = new CodePipeline(this, 'pipeline', {
       synth: codeBuildAction
-    })
+    });
+    pipeline.addStage(new WebsiteStage(this, 'websiteStage', {domainName: domainName}));
   }
 }

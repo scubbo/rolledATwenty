@@ -1,5 +1,29 @@
+import {Bucket} from '@aws-cdk/aws-s3';
+import {BucketDeployment, Source} from '@aws-cdk/aws-s3-deployment';
 import * as cdk from '@aws-cdk/core';
 import {CodeBuildStep, CodePipeline, CodePipelineSource} from '@aws-cdk/pipelines';
+
+class WebsiteStage extends cdk.Stage {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
+    super(scope, id, props);
+
+    new WebsiteStack(this, 'WebsiteStack');
+
+  }
+}
+
+class WebsiteStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    const bucket = new Bucket(this, 'Bucket');
+
+    new BucketDeployment(this, 'BucketDeployment', {
+        destinationBucket: bucket,
+        sources: [Source.asset('static-content')]
+    })
+  }
+}
 
 export class RolledATwentyStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -26,8 +50,9 @@ export class RolledATwentyStack extends cdk.Stack {
         }
     )
 
-    new CodePipeline(this, 'pipeline', {
+    const pipeline = new CodePipeline(this, 'pipeline', {
       synth: codeBuildAction
-    })
+    });
+    pipeline.addStage(new WebsiteStage(this, 'websiteStage'));
   }
 }

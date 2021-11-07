@@ -9,16 +9,24 @@ import {BucketDeployment, Source} from '@aws-cdk/aws-s3-deployment';
 import * as cdk from '@aws-cdk/core';
 import {CodeBuildStep, CodePipeline, CodePipelineSource} from '@aws-cdk/pipelines';
 
+interface WebsiteStageProps extends cdk.StageProps {
+  domainName: string
+}
+
 class WebsiteStage extends cdk.Stage {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StageProps) {
+  constructor(scope: cdk.Construct, id: string, props: WebsiteStageProps) {
     super(scope, id, props);
 
-    new WebsiteStack(this, 'WebsiteStack');
+    new WebsiteStack(this, 'WebsiteStack', {domainName: props.domainName});
   }
 }
 
+interface WebsiteStackProps extends cdk.StackProps {
+  domainName: string
+}
+
 class WebsiteStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.Construct, id: string, props: WebsiteStackProps) {
     super(scope, id, {
       ...props,
       env: {
@@ -28,7 +36,7 @@ class WebsiteStack extends cdk.Stack {
 
     const bucket = new Bucket(this, 'Bucket');
 
-    const domainName = 'butirolledanat20.net';
+    const domainName = props.domainName;
     const zone = HostedZone.fromLookup(this, 'hostedZone', {
       domainName: domainName
     });
@@ -69,6 +77,7 @@ export class RolledATwentyStack extends cdk.Stack {
     const repo = this.node.tryGetContext("repo");
     const branch = this.node.tryGetContext("branch");
     const secretName = this.node.tryGetContext("secretName");
+    const domainName = this.node.tryGetContext("domainName");
 
     // https://cdkworkshop.com/20-typescript/70-advanced-topics/200-pipelines/3000-new-pipeline.html
     const codeBuildAction = new CodeBuildStep('SynthStep', {
@@ -81,13 +90,9 @@ export class RolledATwentyStack extends cdk.Stack {
           commands: [
             'npm ci',
             'npm run build',
-            `npx cdk synth --context user=${user} --context repo=${repo} --context branch=${branch} --context secretName=${secretName}`
+            `npx cdk synth --context user=${user} --context repo=${repo} --context branch=${branch} --context secretName=${secretName} --context domainName=${domainName}`
           ],
           rolePolicyStatements: [
-            // new PolicyStatement({
-            //   actions: ['route53:ListHostedZonesByName'],
-            //   resources: ['*'],
-            // }),
             new PolicyStatement({
               actions: ['sts:AssumeRole'],
               resources: ['*'],
@@ -104,6 +109,6 @@ export class RolledATwentyStack extends cdk.Stack {
     const pipeline = new CodePipeline(this, 'pipeline', {
       synth: codeBuildAction
     });
-    pipeline.addStage(new WebsiteStage(this, 'websiteStage'));
+    pipeline.addStage(new WebsiteStage(this, 'websiteStage', {domainName: domainName}));
   }
 }
